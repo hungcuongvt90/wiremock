@@ -42,7 +42,14 @@ public class MatchesJsonPathPattern extends PathPattern {
         return expectedValue;
     }
 
-    protected MatchResult isSimpleJsonPathMatch(String value) {
+    protected MatchResult isSimpleMatch(String value) {
+        // For performance reason, don't try to parse XML value
+        if (value != null && value.trim().startsWith("<")) {
+            notifier().info(String.format(
+                    "Warning: JSON path expression '%s' failed to match document '%s' because it's not JSON document",
+                    expectedValue, value));
+            return MatchResult.noMatch();
+        }
         try {
             Object obj = JsonPath.read(value, expectedValue);
 
@@ -76,7 +83,14 @@ public class MatchesJsonPathPattern extends PathPattern {
 
     }
 
-    protected MatchResult isAdvancedJsonPathMatch(String value) {
+    protected MatchResult isAdvancedMatch(String value) {
+        // For performance reason, don't try to parse XML value
+        if (value != null && value.trim().startsWith("<")) {
+            notifier().info(String.format(
+                    "Warning: JSON path expression '%s' failed to match document '%s' because it's not JSON document",
+                    expectedValue, value));
+            return MatchResult.noMatch();
+        }
         Object obj = null;
         try {
             obj = JsonPath.read(value, expectedValue);

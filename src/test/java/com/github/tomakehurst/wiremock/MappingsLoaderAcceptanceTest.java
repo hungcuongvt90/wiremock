@@ -19,13 +19,21 @@ import com.github.tomakehurst.wiremock.common.SingleRootFileSource;
 import com.github.tomakehurst.wiremock.core.Options;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.standalone.JsonFileMappingsSource;
+import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import com.github.tomakehurst.wiremock.testsupport.WireMatchers;
+import com.github.tomakehurst.wiremock.testsupport.TestFiles;
 import com.github.tomakehurst.wiremock.testsupport.WireMockResponse;
 import com.github.tomakehurst.wiremock.testsupport.WireMockTestClient;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.List;
+
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static com.github.tomakehurst.wiremock.testsupport.TestFiles.filePath;
+import static com.github.tomakehurst.wiremock.testsupport.WireMatchers.stubMappingWithUrl;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -54,7 +62,7 @@ public class MappingsLoaderAcceptanceTest {
     @Test
 	public void mappingsLoadedFromJsonFiles() {
         buildWireMock(configuration);
-        wireMockServer.loadMappingsUsing(new JsonFileMappingsSource(new SingleRootFileSource("src/test/resources/test-requests")));
+        wireMockServer.loadMappingsUsing(new JsonFileMappingsSource(new SingleRootFileSource(filePath("test-requests"))));
 
 		WireMockResponse response = testClient.get("/canned/resource/1");
 		assertThat(response.statusCode(), is(200));
@@ -68,4 +76,21 @@ public class MappingsLoaderAcceptanceTest {
         buildWireMock(configuration.usingFilesUnderClasspath("classpath-filesource"));
         assertThat(testClient.get("/test").content(), is("THINGS!"));
     }
+
+    @Test
+    public void loadsStubMappingsFromAMixtureOfSingleAndMultiStubFiles() {
+        buildWireMock(configuration);
+        wireMockServer.resetMappings();
+        wireMockServer.loadMappingsUsing(new JsonFileMappingsSource(new SingleRootFileSource(filePath("multi-stub"))));
+
+        List<StubMapping> stubs = wireMockServer.listAllStubMappings().getMappings();
+
+        assertThat(stubs.size(), is(4));
+        assertThat(stubs, hasItem(stubMappingWithUrl("/single/1")));
+        assertThat(stubs, hasItem(stubMappingWithUrl("/multi/1")));
+        assertThat(stubs, hasItem(stubMappingWithUrl("/multi/2")));
+        assertThat(stubs, hasItem(stubMappingWithUrl("/multi/3")));
+    }
+
+
 }

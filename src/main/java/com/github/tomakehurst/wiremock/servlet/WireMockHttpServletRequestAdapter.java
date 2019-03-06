@@ -23,24 +23,21 @@ import com.github.tomakehurst.wiremock.http.HttpHeaders;
 import com.github.tomakehurst.wiremock.http.QueryParameter;
 import com.github.tomakehurst.wiremock.http.Request;
 import com.github.tomakehurst.wiremock.http.RequestMethod;
+import com.github.tomakehurst.wiremock.jetty9.DefaultMultipartRequestConfigurer;
 import com.github.tomakehurst.wiremock.jetty9.JettyUtils;
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Maps;
-import java.io.ByteArrayInputStream;
+
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.*;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.Part;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
 
 import static com.github.tomakehurst.wiremock.common.Encoding.encodeBase64;
 import static com.github.tomakehurst.wiremock.common.Exceptions.throwUnchecked;
@@ -59,16 +56,16 @@ public class WireMockHttpServletRequestAdapter implements Request {
     public static final String ORIGINAL_REQUEST_KEY = "wiremock.ORIGINAL_REQUEST";
 
     private final HttpServletRequest request;
+    private final MultipartRequestConfigurer multipartRequestConfigurer;
     private byte[] cachedBody;
     private String urlPrefixToRemove;
     private Collection<Part> cachedMultiparts;
 
-    public WireMockHttpServletRequestAdapter(HttpServletRequest request) {
+    public WireMockHttpServletRequestAdapter(HttpServletRequest request,
+                                             MultipartRequestConfigurer multipartRequestConfigurer,
+                                             String urlPrefixToRemove) {
         this.request = request;
-    }
-
-    public WireMockHttpServletRequestAdapter(HttpServletRequest request, String urlPrefixToRemove) {
-        this.request = request;
+        this.multipartRequestConfigurer = multipartRequestConfigurer;
         this.urlPrefixToRemove = urlPrefixToRemove;
     }
 
@@ -170,7 +167,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
     public String getHeader(String key) {
         List<String> headerNames = list(request.getHeaderNames());
         for (String currentKey : headerNames) {
-            if (currentKey.toLowerCase().equals(key.toLowerCase())) {
+            if (currentKey.equalsIgnoreCase(key)) {
                 return request.getHeader(currentKey);
             }
         }
@@ -183,7 +180,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
     public HttpHeader header(String key) {
         List<String> headerNames = list(request.getHeaderNames());
         for (String currentKey : headerNames) {
-            if (currentKey.toLowerCase().equals(key.toLowerCase())) {
+            if (currentKey.equalsIgnoreCase(key)) {
                 List<String> valueList = list(request.getHeaders(currentKey));
                 if (valueList.isEmpty()) {
                     return HttpHeader.empty(key);
@@ -219,7 +216,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
     @SuppressWarnings("unchecked")
     @Override
     public Set<String> getAllHeaderKeys() {
-        LinkedHashSet<String> headerKeys = new LinkedHashSet<String>();
+        LinkedHashSet<String> headerKeys = new LinkedHashSet<>();
         for (Enumeration<String> headerNames = request.getHeaderNames(); headerNames.hasMoreElements(); ) {
             headerKeys.add(headerNames.nextElement());
         }
@@ -253,7 +250,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
 
     @Override
     public boolean isBrowserProxyRequest() {
-        if (!isJetty()) {
+        if (!JettyUtils.isJetty()) {
             return false;
         }
         if (request instanceof org.eclipse.jetty.server.Request) {
@@ -273,12 +270,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
 
         if (cachedMultiparts == null) {
             try {
-                String contentTypeHeaderValue = from(contentTypeHeader().values()).join(Joiner.on(" "));
-                InputStream inputStream = new ByteArrayInputStream(getBody());
-                MultiPartInputStreamParser inputStreamParser = new MultiPartInputStreamParser(inputStream, contentTypeHeaderValue, null, null);
-                MultipartConfigElement multipartConfigElement = new MultipartConfigElement((String)null);
-                request.setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
-                request.setAttribute(org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM, inputStreamParser);
+                multipartRequestConfigurer.configure(request);
                 cachedMultiparts = from(safelyGetRequestParts()).transform(new Function<javax.servlet.http.Part, Part>() {
                     @Override
                     public Part apply(javax.servlet.http.Part input) {
@@ -334,22 +326,7 @@ public class WireMockHttpServletRequestAdapter implements Request {
         Request originalRequest = (Request) request.getAttribute(ORIGINAL_REQUEST_KEY);
         return Optional.fromNullable(originalRequest);
     }
-
-    private boolean isJetty() {
-        try {
-            getClass("org.eclipse.jetty.server.Request");
-            return true;
-        } catch (Exception e) {
-        }
-        return false;
-    }
-
-    private void getClass(String type) throws ClassNotFoundException {
-        ClassLoader contextCL = Thread.currentThread().getContextClassLoader();
-        ClassLoader loader = contextCL == null ? WireMockHttpServletRequestAdapter.class.getClassLoader() : contextCL;
-        Class.forName(type, false, loader);
-    }
-
+    
     @Override
     public String toString() {
         return request.toString() + getBodyAsString();

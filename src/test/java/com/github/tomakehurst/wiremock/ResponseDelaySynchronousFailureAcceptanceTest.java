@@ -44,7 +44,7 @@ import static org.junit.Assert.fail;
 
 public class ResponseDelaySynchronousFailureAcceptanceTest {
 
-    private static final int SOCKET_TIMEOUT_MILLISECONDS = 500;
+    private static final int SOCKET_TIMEOUT_MILLISECONDS = 1000;
     private static final int SHORTER_THAN_SOCKET_TIMEOUT = SOCKET_TIMEOUT_MILLISECONDS / 2;
 
     private ExecutorService httpClientExecutor = Executors.newCachedThreadPool();
@@ -54,7 +54,7 @@ public class ResponseDelaySynchronousFailureAcceptanceTest {
 
     private WireMockConfiguration getOptions() {
         WireMockConfiguration wireMockConfiguration = new WireMockConfiguration();
-        wireMockConfiguration.jettyAcceptors(1).containerThreads(4);
+        wireMockConfiguration.jettyAcceptors(1).containerThreads(8);
         wireMockConfiguration.asynchronousResponseEnabled(false);
         wireMockConfiguration.dynamicPort();
         return wireMockConfiguration;

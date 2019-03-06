@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.github.tomakehurst.wiremock.common;
+package com.github.tomakehurst.wiremock.jetty9;
 
-import javax.xml.bind.DatatypeConverter;
+import com.github.tomakehurst.wiremock.servlet.MultipartRequestConfigurer;
 
-class DatatypeConverterBase64Encoder implements Base64Encoder {
+import javax.servlet.MultipartConfigElement;
+import javax.servlet.http.HttpServletRequest;
+
+public class DefaultMultipartRequestConfigurer implements MultipartRequestConfigurer {
+
     @Override
-    public String encode(byte[] content) {
-        return DatatypeConverter.printBase64Binary(content);
-    }
-
-    @Override
-    public byte[] decode(String base64) {
-        return DatatypeConverter.parseBase64Binary(base64);
+    public void configure(HttpServletRequest request) {
+        MultipartConfigElement multipartConfigElement = new MultipartConfigElement((String)null);
+        request.setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
     }
 }
